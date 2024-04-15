@@ -1,7 +1,7 @@
 const express=require("express");
 const userRouter=require("./user")
-
-const router=express.Router();
-router.use("/user",userRouter);
-
-module.exports= router;
+const accountRouter=require("./account")
+const rootRouter=express.Router();
+rootRouter.use("/user",userRouter);
+rootRouter.use("/account",accountRouter);
+module.exports= rootRouter;

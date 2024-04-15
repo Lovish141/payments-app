@@ -1,15 +1,15 @@
 const express=require("express");
 const {z}=require("zod");
-const userModel = require("../db");
 const  jwt  = require("jsonwebtoken");
 const {JWT_SECRET}=require("../config");
-const { authMiddleWare } = require("../middlewares/middleware");
+const { authMiddleWare } = require("../middlewares/authMiddleware");
+const { User,Account } = require("../db");
 
 const signUpBody= z.object({
     userName:z.string().email(),
+    password:z.string(),
     firstName:z.string(),
-    lastName:z.string(),
-    password:z.string()
+    lastName:z.string()
 })
 
 const signInBody=z.object({
@@ -22,12 +22,13 @@ const updateBody=z.object({
     firstName:z.string().optional(),
     lastName:z.string().optional()
 })
-const router=express.Router();
+const userRouter=express.Router();
 
 
 // signUP Route
-router.post("/signUp",async (req,res)=>{
+userRouter.post("/signUp",async (req,res)=>{
     const {success}=signUpBody.safeParse(req.body);
+    // console.log(req.body);
     if(!success){
         return res.status(411).json(
             {
@@ -35,10 +36,10 @@ router.post("/signUp",async (req,res)=>{
             }
         )
     }
-
-    const existingUser=await userModel.findOne({
-        userName:req.body.userName
+    const existingUser = await User.findOne({
+        userName: req.body.userName
     })
+
 
     if(existingUser){
         return res.status(411).json({
@@ -46,7 +47,7 @@ router.post("/signUp",async (req,res)=>{
         })
     }
 
-    const user= await userModel.create({
+    const user= await User.create({
         userName:req.body.userName,
         password:req.body.password,
         firstName:req.body.firstName,
@@ -55,7 +56,12 @@ router.post("/signUp",async (req,res)=>{
 
     const userID=user._id;
 
-    const token=jwt.sign({
+    // Adding demo balance in the start when the new user signs up
+    await Account.create({
+        userId:userID,
+        balance:1+ Math.random()*10000
+    })
+    const token=jwt.sign({ 
         userID
     },JWT_SECRET);
 
@@ -67,7 +73,7 @@ router.post("/signUp",async (req,res)=>{
 
 // signIn Route
 
-router.post("/signIn",async(req,res)=>{
+userRouter.post("/signIn",async(req,res)=>{
     const {success}=signInBody.safeParse(req.body);
     if(!success){
         return res.status(411).json({
@@ -75,7 +81,7 @@ router.post("/signIn",async(req,res)=>{
         })
     }
 
-    const user=await userModel.findOne({
+    const user=await User.findOne({
         userName:req.body.userName
     })
 
@@ -97,7 +103,7 @@ router.post("/signIn",async(req,res)=>{
 
 // update route
 //using auth middleware to verify if the user is already logged in
-router.put("/",authMiddleWare,async (req,res)=>{
+userRouter.put("/",authMiddleWare,async (req,res)=>{
     const {success}=updateBody.safeParse(req.body);
 
     if(!success){
@@ -106,7 +112,7 @@ router.put("/",authMiddleWare,async (req,res)=>{
         })
     }
 
-    await userModel.updateOne({_id:req.userId},req.body)
+    await User.updateOne({_id:req.userId},req.body)
 
     return res.json({
         message:"Updated Information Successfully"
@@ -115,10 +121,10 @@ router.put("/",authMiddleWare,async (req,res)=>{
 
 
 // get users from backend,filterable by firstNAme,lastName
-router.get("/bulk",async (req,res)=>{
+userRouter.get("/bulk",async (req,res)=>{
     const filter=req.query.filter || "";
 
-    const users=await userModel.find({
+    const users=await User.find({
         $or:[{
             firstName:{
                 "$regex":filter
@@ -142,4 +148,4 @@ router.get("/bulk",async (req,res)=>{
     
 })
 
-module.exports= router;
+module.exports= userRouter;
